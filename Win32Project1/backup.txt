@@ -1,0 +1,482 @@
+// Win32Project1.cpp : Defines the entry point for the application.
+//
+
+#include "stdafx.h"
+#include "Win32Project1.h"
+
+#define MAX_LOADSTRING 100
+
+
+
+// Global Variables:
+HINSTANCE hInst;                                // current instance
+WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
+WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+
+// Forward declarations of functions included in this code module:
+ATOM                MyRegisterClass(HINSTANCE hInstance);
+BOOL                InitInstance(HINSTANCE, int);
+LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK Error(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK Delete(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                     _In_opt_ HINSTANCE hPrevInstance,
+                     _In_ LPWSTR    lpCmdLine,
+                     _In_ int       nCmdShow)
+{
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
+
+    // TODO: Place code here.
+
+    // Initialize global strings
+    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDC_WIN32PROJECT1, szWindowClass, MAX_LOADSTRING);
+    MyRegisterClass(hInstance);
+
+    // Perform application initialization:
+    if (!InitInstance (hInstance, nCmdShow))
+    {
+        return FALSE;
+    }
+
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32PROJECT1));
+
+    MSG msg;
+
+    // Main message loop:
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+    return (int) msg.wParam;
+}
+
+
+
+//
+//  FUNCTION: MyRegisterClass()
+//
+//  PURPOSE: Registers the window class.
+//
+ATOM MyRegisterClass(HINSTANCE hInstance)
+{
+    WNDCLASSEXW wcex;
+
+    wcex.cbSize = sizeof(WNDCLASSEX);
+
+    wcex.style          = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc    = WndProc;
+    wcex.cbClsExtra     = 0;
+    wcex.cbWndExtra     = 0;
+    wcex.hInstance      = hInstance;
+    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_WIN32PROJECT1));
+    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+	wcex.lpszMenuName	= NULL;//MAKEINTRESOURCEW(IDC_WIN32PROJECT1);
+    wcex.lpszClassName  = szWindowClass;
+    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+
+    return RegisterClassExW(&wcex);
+}
+
+//
+//   FUNCTION: InitInstance(HINSTANCE, int)
+//
+//   PURPOSE: Saves instance handle and creates main window
+//
+//   COMMENTS:
+//
+//        In this function, we save the instance handle in a global variable and
+//        create and display the main program window.
+//
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+{
+   hInst = hInstance; // Store instance handle in our global variable
+
+   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_SYSMENU ,
+      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+
+   if (!hWnd)
+   {
+      return FALSE;
+   }
+
+   ShowWindow(hWnd, nCmdShow);
+   UpdateWindow(hWnd);
+
+   return TRUE;
+}
+
+#include <iostream>
+#include <stdlib.h>
+#include "Tree.h"
+
+int WcharToInt(TCHAR *value);
+void paintBackground(HWND hWnd, HDC hdc, int ScreenWidth, int ScreenHight, int  MenuWidth, int MenuHight, bool onlyBack);
+
+Tree tree;
+int ScreenWidth;
+int ScreenHight;
+//
+//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
+//
+//  PURPOSE:  Processes messages for the main window.
+//
+//  WM_COMMAND  - process the application menu
+//  WM_PAINT    - Paint the main window
+//  WM_DESTROY  - post a quit message and return
+//
+//
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	PAINTSTRUCT ps;
+	static HDC hdc;
+
+	static bool first = true;
+
+	static int ScreenWidth;
+	static int ScreenHight;
+	static int MenuWidth;
+	static int MenuHight;
+	static int caption;
+	static int ButtonWidth = 220, ButtonHight = 30;
+
+	static TCHAR name[256] = _T("");;
+	static OPENFILENAME file;
+	std::ifstream in;
+	std::ofstream out;
+	static std::vector<std::string> v;
+	std::vector<std::string>::iterator it;
+	std::string st;
+	
+	static HWND hBtn[6];
+	static HWND hVScroll, hHScroll;
+	
+	static int n, length, sx, sy, cx, scrollWidth, iVscrollPos, iHscrollPos, COUNT, MAX_WIDTH;
+
+    switch (message)
+    {
+    case WM_COMMAND:
+        {
+
+			if (wParam == ID_FILE_OPEN)
+			{
+				hdc = GetDC(hWnd);
+				file.lpstrTitle = _T("Открыть файл для чтения");
+				file.Flags = OFN_HIDEREADONLY;
+				if (!GetOpenFileName(&file)) return 1;
+				in.open(name);
+				std::vector<int> vec;
+				while (!in.eof())
+				{
+					int value;
+					in >> value;
+					vec.push_back(value);
+				}
+				in.close();
+				std::sort(vec.begin(), vec.end());
+				for (std::vector<int>::iterator it = vec.begin(); it != vec.end(); ++it)
+					tree.Add(*it, true);
+				//SendMessage(hWnd, WM_SIZE, 0, ScreenWidth << 16 | ScreenHight);
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+				tree.Show(hWnd, hdc);
+				ReleaseDC(hWnd, hdc);
+			}
+			if (wParam == ID_FILE_SAVE)
+			{
+				file.lpstrTitle = _T("Открыть файл для записи");
+				file.Flags = OFN_NOTESTFILECREATE;
+				if (!GetSaveFileName(&file)) return 1;
+				out.open(name);
+				tree.getAllElements();
+				for (std::vector<int>::iterator it = tree.elements.begin(); it != tree.elements.end(); ++it)
+					out << *it << " ";
+				out.close();
+			}
+			if (wParam == ID_FILE_BACKUP)
+			{
+				hdc = GetDC(hWnd);
+				file.lpstrTitle = _T("Открыть файл для чтения");
+				file.Flags = OFN_HIDEREADONLY;
+				if (!GetOpenFileName(&file)) return 1;
+				in.open(name);
+				
+				while (!in.eof())
+				{
+					int value;
+					in >> value;
+					tree.Add(value, false);
+				}
+				in.close();
+				//SendMessage(hWnd, WM_SIZE, 0, ScreenWidth << 16 | ScreenHight);
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+				tree.Show(hWnd, hdc);
+				ReleaseDC(hWnd, hdc);
+			}
+			if (wParam == ID_ADD)
+			{
+				hdc=GetDC(hWnd);
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+				tree.Show(hWnd, hdc);
+				ReleaseDC(hWnd, hdc);
+			}
+			if (wParam == ID_DELETE)
+			{
+				hdc = GetDC(hWnd);
+				try {
+					tree.CheckIfEmpty();
+				}
+				catch (Tree::NullException) {
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ERROREMPTY), hWnd, Error);
+					ReleaseDC(hWnd, hdc);
+					break;
+				}
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_DELETE), hWnd, Delete);
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+				tree.Show(hWnd, hdc);
+				ReleaseDC(hWnd, hdc);
+			}
+			if (wParam == ID_DELETE_ALL)
+			{
+				hdc = GetDC(hWnd);
+				try {
+					tree.CheckIfEmpty();
+				}
+				catch (Tree::NullException) {
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+					paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+					tree.Show(hWnd, hdc);
+					ReleaseDC(hWnd, hdc);
+					break;
+				}
+				if(IDYES == MessageBox(hWnd, _T("Дерево будет полностью удалено"),
+					_T("Предупреждение"), MB_YESNO | MB_ICONQUESTION)) 
+					tree.deleteAll();
+ 
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, false);
+				tree.Show(hWnd, hdc);
+				ReleaseDC(hWnd, hdc);
+			}
+        }
+        break;
+	case WM_CREATE:
+		{
+			SetTimer(hWnd, 1, 100, NULL);
+			file.lStructSize = sizeof(OPENFILENAME);
+			file.hInstance = hInst;
+			file.lpstrFilter = _T("Text\0*.tree");
+			file.lpstrFile = name;
+			file.nMaxFile = 256;
+			file.lpstrInitialDir = _T(".\\");
+			file.lpstrDefExt = _T("tree");
+			hHScroll = CreateWindow(_T("scrollbar"), NULL, WS_CHILD | WS_VISIBLE,
+				0, 0, 0, 0, hWnd, NULL, hInst, NULL);
+			hVScroll = CreateWindow(_T("scrollbar"), NULL, WS_CHILD | WS_VISIBLE,
+				0, 0, 0, 0, hWnd, NULL, hInst, NULL);
+		}
+		break;
+		case WM_SIZE:
+		{
+			hdc = GetDC(hWnd);
+			ScreenWidth = LOWORD(lParam);
+			ScreenHight = HIWORD(lParam);
+			MenuWidth = LOWORD(lParam) / 6;
+			MenuHight = HIWORD(lParam);
+			ButtonWidth = MenuWidth - 10;
+			paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, true);
+			tree.Show(hWnd, hdc);
+			tree.GiveX((ScreenWidth+MenuWidth) / 2);
+			caption = GetSystemMetrics(SM_CYCAPTION);
+			RECT rt;
+			scrollWidth = ScreenWidth % 80;
+			//MoveWindow(hVScroll, ScreenWidth - scrollWidth, 0, ScreenWidth, ScreenHight, false);
+			//SetScrollRange(hVScroll, SB_CTL, 0, ScreenWidth, FALSE);
+			//SetScrollPos(hVScroll, SB_CTL, 0, TRUE);
+			//MoveWindow(hHScroll, MenuWidth, ScreenHight - scrollWidth, ScreenWidth - 165, ScreenHight, true);
+			
+			
+			InvalidateRect(hVScroll, NULL, true);
+			//InvalidateRect(hScroll, NULL, true);
+			ReleaseDC(hWnd, hdc);
+		}
+		break;
+		case WM_MOVE:
+		{
+			hdc = GetDC(hWnd);
+			paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, true);
+			for (int i = 0; i < 5; i++)
+			InvalidateRect(hBtn[i], 0, true);
+			tree.Show(hWnd, hdc);
+			InvalidateRect(hVScroll, NULL, true);
+			ReleaseDC(hWnd, hdc);
+		}
+		break;
+		case WM_TIMER:
+		{
+			if(first) 
+			{
+				hdc = GetDC(hWnd);
+				paintBackground(hWnd, hdc, ScreenWidth, ScreenHight, MenuWidth, MenuHight, true);
+				tree.Show(hWnd, hdc);
+				hBtn[0] = CreateWindow(_T("BUTTON"), _T("Новое дерево"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2 - 5*ButtonHight * 3 / 2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_DELETE_ALL, hInst, NULL);
+				hBtn[1] = CreateWindow(_T("BUTTON"), _T("Добавить элемент"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_ADD, hInst, NULL);
+				hBtn[2] = CreateWindow(_T("BUTTON"), _T("Удалить элемент"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2 + ButtonHight * 3 / 2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_DELETE, hInst, NULL);
+				hBtn[3] = CreateWindow(_T("BUTTON"), _T("Добавить из файла"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2 + 2*ButtonHight * 3 / 2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_FILE_OPEN, hInst, NULL);
+				hBtn[4] = CreateWindow(_T("BUTTON"), _T("Сохранить в файл"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2 + 3*ButtonHight * 3 / 2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_FILE_SAVE, hInst, NULL);
+				hBtn[5] = CreateWindow(_T("BUTTON"), _T("Восстановить дерево"), BS_PUSHBUTTON | WS_VISIBLE | WS_CHILD | WS_TABSTOP, 5, ScreenHight / 2 + 5 * ButtonHight * 3 / 2 - ButtonHight/2, ButtonWidth, ButtonHight, hWnd, (HMENU)ID_FILE_BACKUP, hInst, NULL);
+				InvalidateRect(hVScroll, NULL, true);
+				first = false;
+			}
+			else { 
+			//hdc = GetDC(hWnd); 
+				
+			//ReleaseDC(hWnd, hdc); 
+			}
+		}
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Message handler for about box.
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	static int dlgWidth;
+	static int dlgHight;
+
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+	case WM_SIZE:
+		dlgWidth = LOWORD(lParam);
+		dlgHight = HIWORD(lParam);
+		break;
+    case WM_INITDIALOG:
+        return(INT_PTR)TRUE;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+			TCHAR value[100];
+			GetDlgItemText(hDlg, IDC_EDIT, value, 100);
+			int valueInt = WcharToInt(value);
+			tree.Add(valueInt,true);
+			return (INT_PTR)TRUE;
+        }
+		if (LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+int WcharToInt(TCHAR *value)
+{
+	unsigned int idx = 0;
+	
+	int result = 0;
+	while (value[idx] >= '0' && value[idx] <= '9')
+	{
+		result = result * 10 + (value[idx] - '0');
+		++idx;
+	}
+	return result;
+}
+
+void paintBackground(HWND hWnd, HDC hdc, int ScreenWidth, int ScreenHight, int  MenuWidth, int MenuHight, bool onlyBack )
+{
+	hdc = GetDC(hWnd);
+	HRGN hrgnMenu;
+	HBRUSH hBrush;
+	if (onlyBack) {
+		HDC memDC;
+		HBITMAP hPicture;
+		hPicture = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_BITMAP1));
+		hrgnMenu = CreateRectRgn(0, 0, MenuWidth, MenuHight);
+		hBrush = CreateSolidBrush(RGB(130, 130, 130));
+		FillRgn(hdc, hrgnMenu, hBrush);
+		DeleteObject(hrgnMenu);
+		DeleteObject(hBrush);
+		memDC = CreateCompatibleDC(hdc);
+		SelectObject(memDC, hPicture);
+		BitBlt(hdc, 5, 65, 150, 150, memDC, 0, 0, SRCCOPY);
+		DeleteDC(memDC);
+	}
+	hrgnMenu = CreateRectRgn(MenuWidth, 0, ScreenWidth, ScreenHight);
+	hBrush = CreateSolidBrush(RGB(10, 10, 10));
+	FillRgn(hdc, hrgnMenu, hBrush);
+	DeleteObject(hrgnMenu);
+	DeleteObject(hBrush);
+	ReleaseDC(hWnd, hdc);
+}
+
+INT_PTR CALLBACK Error(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
+
+INT_PTR CALLBACK Delete(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			TCHAR value[100];
+			GetDlgItemText(hDlg, IDC_EDIT, value, 100);
+			int valueInt = WcharToInt(value);
+			try { tree.Delete(valueInt); }
+			catch (Tree::NullException) {
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_ERROREMPTY), hDlg, Error);
+			}
+			catch (Tree::NotFoundException) {
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_ERRORNOTFOUND), hDlg, Error);
+			}
+			return (INT_PTR)TRUE;
+		}
+		if (LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
+
